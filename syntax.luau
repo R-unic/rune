@@ -1,3 +1,5 @@
+--!strict
+--!native
 export type SyntaxKind = number -- for hinting
 
 local SyntaxKind = {
@@ -48,7 +50,7 @@ table.freeze(SyntaxKind)
 type SyntaxName = keyof<typeof(SyntaxKind)>
 
 local SyntaxKindInverse: { [number]: SyntaxName } = {}
-for k, v in SyntaxKind do
+for k, v in SyntaxKind :: { [SyntaxName]: SyntaxKind } do
   SyntaxKindInverse[v] = k
 end
 table.freeze(SyntaxKindInverse)

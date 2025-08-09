@@ -1,6 +1,5 @@
 --!strict
 --!native
-
 export type function gurantee(ty)
   if ty:is("union") then
     local newComponents: { type } = {}

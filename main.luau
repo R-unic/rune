@@ -1,3 +1,5 @@
+--!strict
+--!native
 local fs = require("@lune/fs") :: fs
 local process = require("@lune/process") :: process
 local tokenize = require("./lexer")
