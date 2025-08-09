@@ -5,15 +5,15 @@ local token = require("../token")
 local util = require("../util-types")
 
 local Literal = {}
-export type Literal = {
+export type Literal = expression.Expression & {
   read token: token.Token;
 }
 
 local function literal(token: token.Token): Literal
-  local node = setmetatable(expression(), Literal) :: util.writable<Literal>
+  local node = expression() :: util.writable<Literal>
   node.token = token
 
-  return node
+  return setmetatable(node, Literal) :: any
 end
 
 return literal

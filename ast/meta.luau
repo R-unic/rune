@@ -1,12 +1,14 @@
+--!strict
+--!native
 local Node = {}
 local Expression = setmetatable({}, Node)
 local Statement = setmetatable({}, Node)
 
-local function hasMetatable<T>(t: T & {}, mt: {}): boolean
+local function hasMetatable<T>(t: T, mt: {}): boolean
   local meta = getmetatable(t)
   local match = meta == mt
   while meta do
-    meta = getmetatable(meta)
+    meta = getmetatable(meta) :: {}
     match = match or meta == mt
   end
 

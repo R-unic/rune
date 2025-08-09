@@ -1,13 +1,13 @@
 --!strict
 --!native
-local process = require("@lune/process") :: process
 local syntax = require("./syntax")
 local token = require("./token")
+local error = require("./error")
 local SyntaxKind = syntax.SyntaxKind
 local keywords = syntax.keywords
 local unpack = table.unpack
 
-export type LexerState = {
+type LexState = {
   read source: { number };
   read sourceLength: number;
   read tokens: { token.Token };
@@ -16,11 +16,6 @@ export type LexerState = {
   position: number;
   lexemeStartLocation: token.Location;
 }
-
-local function error(message: string): never
-  print("[!]", message)
-  return process.exit(1)
-end
 
 local function isAlphabetic(char: number): boolean
   local matchesUppercase = char >= 65 and char <= 90
@@ -48,12 +43,12 @@ local function isWhitespace(char: number, carriageReturnIncluded: boolean?): boo
   return char == 32 or char == 9 or isLineFeed(char) or isCarriageReturn(char)
 end
 
-local function isEOF(state: LexerState, position: number?): boolean
+local function isEOF(state: LexState, position: number?): boolean
   position = position or state.position
   return position > state.sourceLength
 end
 
-local function getCharacter(state: LexerState, offset: number?): number
+local function getCharacter(state: LexState, offset: number?): number
   offset = offset or 0
 
   local position = state.position
@@ -64,18 +59,18 @@ local function getCharacter(state: LexerState, offset: number?): number
   return state.source[position + offset]
 end
 
-local function getLocation(state: LexerState): token.Location
+local function getLocation(state: LexState): token.Location
   return token.createLocation(state.line, state.column, state.position)
 end
 
-local function advance(state: LexerState): number?
+local function advance(state: LexState): number?
   state.position += 1
   state.column += 1
 
   return if isEOF(state) then nil else getCharacter(state)
 end
 
-local function match(state: LexerState, char: string): boolean
+local function match(state: LexState, char: string): boolean
   local isMatch = char == string.char(getCharacter(state))
   if isMatch then
     advance(state)
@@ -83,7 +78,7 @@ local function match(state: LexerState, char: string): boolean
   return isMatch
 end
 
-local function getCurrentLexeme(state: LexerState): string
+local function getCurrentLexeme(state: LexState): string
   local lexemeBytes: { number } = {}
   for i = state.lexemeStartLocation.position, state.position - 1 do
     table.insert(lexemeBytes, state.source[i])
@@ -92,7 +87,7 @@ local function getCurrentLexeme(state: LexerState): string
   return string.char(unpack(lexemeBytes))
 end
 
-local function addToken(state: LexerState, kind: syntax.SyntaxKind, value: token.TokenValue?): ()
+local function addToken(state: LexState, kind: syntax.SyntaxKind, value: token.TokenValue?): ()
   local lexeme = getCurrentLexeme(state)
   local finishLocation = getLocation(state)
   local span = token.createLocationSpan(state.lexemeStartLocation, finishLocation)
@@ -100,7 +95,7 @@ local function addToken(state: LexerState, kind: syntax.SyntaxKind, value: token
   state.lexemeStartLocation = finishLocation
 end
 
-local function skipNewLines(state: LexerState): ()
+local function skipNewLines(state: LexState): ()
   state.line += 1
 
   local current = getCharacter(state)
@@ -119,7 +114,7 @@ local function skipNewLines(state: LexerState): ()
   -- TODO: trivia tokens?
 end
 
-local function skipWhitespace(state: LexerState): ()
+local function skipWhitespace(state: LexState): ()
   if not isEOF(state) then
     local current = getCharacter(state)
     while not isEOF(state) and isWhitespace(current) and not isLineFeed(current) do
@@ -131,7 +126,7 @@ local function skipWhitespace(state: LexerState): ()
   state.lexemeStartLocation = getLocation(state)
 end
 
-local function readIdentifier(state: LexerState): ()
+local function readIdentifier(state: LexState): ()
   if not isEOF(state) then
     local current = getCharacter(state)
     while not isEOF(state) and isAlphanumeric(current) or string.char(current) == "_" do
@@ -156,7 +151,7 @@ local function readIdentifier(state: LexerState): ()
   addToken(state, kind, value)
 end
 
-local function readNumber(state: LexerState): ()
+local function readNumber(state: LexState): ()
   local usedDecimal = false
   if not isEOF(state) then
     local current = getCharacter(state)
@@ -181,7 +176,7 @@ local function readNumber(state: LexerState): ()
   addToken(state, kind, tonumber(lexeme))
 end
 
-local function readString(state: LexerState, terminator: number): ()
+local function readString(state: LexState, terminator: number): ()
   if not isEOF(state) then
     local current = getCharacter(state)
     while not isEOF(state) and current ~= terminator do
@@ -210,7 +205,7 @@ local singleCharMap = {
   ["}"] = SyntaxKind.RBrace
 }
 
-local function lex(state: LexerState): ()
+local function lex(state: LexState): ()
   local byte = getCharacter(state)
   local char = string.char(byte)
   advance(state)
@@ -293,7 +288,7 @@ local function tokenize(source: string): { token.Token }
   local sourceLength = #source
   local sourceBytes = table.pack(string.byte(source, 1, sourceLength))
   local tokens = {}
-  local state: LexerState = {
+  local state: LexState = {
     source = sourceBytes,
     sourceLength = sourceLength,
     tokens = tokens,
