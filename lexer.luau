@@ -2,38 +2,19 @@
 --!native
 local process = require("@lune/process") :: process
 local syntax = require("./syntax")
+local token = require("./token")
 local SyntaxKind = syntax.SyntaxKind
-local SyntaxKindInverse = syntax.SyntaxKindInverse
 local keywords = syntax.keywords
 local unpack = table.unpack
-
-export type Location = {
-  read line: number;
-  read column: number;
-  read position: number;
-}
-
-export type LocationSpan = {
-  read start: Location;
-  read finish: Location;
-}
-
-export type TokenValue = string | boolean | number | nil
-export type Token = {
-  read kind: syntax.SyntaxKind;
-  read lexeme: string;
-  read span: LocationSpan;
-  read value: TokenValue?;
-}
 
 export type LexerState = {
   read source: { number };
   read sourceLength: number;
-  read tokens: { Token };
+  read tokens: { token.Token };
   line: number;
   column: number;
   position: number;
-  lexemeStartLocation: Location;
+  lexemeStartLocation: token.Location;
 }
 
 local function error(message: string): never
@@ -83,17 +64,8 @@ local function getCharacter(state: LexerState, offset: number?): number
   return state.source[position + offset]
 end
 
-local locationMeta = {}
-function locationMeta.__tostring(location: Location): string
-  return `{location.line}:{location.column}`
-end
-
-local function getLocation(state: LexerState): Location
-  return setmetatable({
-    line = state.line,
-    column = state.column,
-    position = state.position
-  }, locationMeta)
+local function getLocation(state: LexerState): token.Location
+  return token.createLocation(state.line, state.column, state.position)
 end
 
 local function advance(state: LexerState): number?
@@ -120,32 +92,11 @@ local function getCurrentLexeme(state: LexerState): string
   return string.char(unpack(lexemeBytes))
 end
 
-local tokenMeta = {}
-function tokenMeta.__tostring(token: Token): string
-  local valueString = if token.value ~= nil then ", " .. tostring(token.value) else ""
-  return `Token({SyntaxKindInverse[token.kind]}, '{token.lexeme}', {token.span}{valueString})`
-end
-
-local locationSpanMeta = {}
-function locationSpanMeta.__tostring(span: LocationSpan): string
-  return `{span.start}-{span.finish}`
-end
-
-local function addToken(state: LexerState, kind: syntax.SyntaxKind, value: TokenValue?): ()
+local function addToken(state: LexerState, kind: syntax.SyntaxKind, value: token.TokenValue?): ()
   local lexeme = getCurrentLexeme(state)
   local finishLocation = getLocation(state)
-  local span: LocationSpan = setmetatable({
-    start = state.lexemeStartLocation,
-    finish = finishLocation
-  }, locationSpanMeta)
-  local token: Token = setmetatable({
-    kind = kind,
-    value = value,
-    span = span,
-    lexeme = lexeme
-  }, tokenMeta)
-
-  table.insert(state.tokens, token)
+  local span = token.createLocationSpan(state.lexemeStartLocation, finishLocation)
+  table.insert(state.tokens, token.createToken(kind, span, lexeme, value))
   state.lexemeStartLocation = finishLocation
 end
 
@@ -190,7 +141,7 @@ local function readIdentifier(state: LexerState): ()
   end
 
   local kind = SyntaxKind.Identifier
-  local value: TokenValue?
+  local value: token.TokenValue?
   local lexeme = getCurrentLexeme(state)
   if lexeme == "true" or lexeme == "false" then
     kind = SyntaxKind.BoolLiteral
@@ -338,7 +289,7 @@ local function lex(state: LexerState): ()
   end
 end
 
-local function tokenize(source: string): { Token }
+local function tokenize(source: string): { token.Token }
   local sourceLength = #source
   local sourceBytes = table.pack(string.byte(source, 1, sourceLength))
   local tokens = {}
@@ -349,7 +300,7 @@ local function tokenize(source: string): { Token }
     line = 1,
     column = 0,
     position = 1,
-    lexemeStartLocation = {} :: Location
+    lexemeStartLocation = {} :: token.Location
   }
 
   state.lexemeStartLocation = getLocation(state)
