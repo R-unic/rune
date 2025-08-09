@@ -145,7 +145,6 @@ local function addToken(state: LexerState, kind: syntax.SyntaxKind, value: Token
 
   table.insert(state.tokens, token)
   state.lexemeStartLocation = finishLocation
-  print(token)
 end
 
 local function skipNewLines(state: LexerState): ()
@@ -191,6 +190,30 @@ local function readIdentifier(state: LexerState): ()
   addToken(state, SyntaxKind.Identifier)
 end
 
+local function readNumber(state: LexerState): ()
+  local usedDecimal = false
+  if not isEOF(state) then
+    local current = getCharacter(state)
+    while not isEOF(state) and isNumeric(current) or string.char(current) == "." do
+      if string.char(current) == "." then
+        if usedDecimal then
+          error("malformed number")
+        end
+        usedDecimal = true
+      end
+      current = advance(state)
+      if not current then break end
+    end
+  end
+
+  local kind = if usedDecimal then
+    SyntaxKind.FloatLiteral
+  else
+    SyntaxKind.IntLiteral
+
+  addToken(state, kind)
+end
+
 local singleCharMap = {
   ["?"] = SyntaxKind.Question,
   [","] = SyntaxKind.Comma,
@@ -208,7 +231,6 @@ local singleCharMap = {
 local function lex(state: LexerState): ()
   local byte = getCharacter(state)
   local char = string.char(byte)
-  print(char)
   advance(state)
 
   if char == "+" then
@@ -255,6 +277,8 @@ local function lex(state: LexerState): ()
     lex(state)
   elseif char == "\n" then
     skipNewLines(state)
+  elseif isNumeric(byte) then
+    readNumber(state)
   elseif isAlphabetic(byte) or char == "_" then
     readIdentifier(state)
   elseif isWhitespace(byte) then
