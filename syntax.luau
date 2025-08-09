@@ -40,7 +40,8 @@ local SyntaxKind = {
   IntLiteral = 36,
   FloatLiteral = 37,
   BoolLiteral = 38,
-  StringLiteral = 39
+  StringLiteral = 39,
+  LetKeyword = 40
 }
 table.freeze(SyntaxKind)
 
@@ -52,7 +53,13 @@ for k, v in SyntaxKind do
 end
 table.freeze(SyntaxKindInverse)
 
+local keywords = {
+  let = SyntaxKind.LetKeyword
+} :: { [string]: number }
+table.freeze(keywords)
+
 return {
   SyntaxKind = SyntaxKind,
-  SyntaxKindInverse = SyntaxKindInverse
+  SyntaxKindInverse = SyntaxKindInverse,
+  keywords = keywords
 }

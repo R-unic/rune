@@ -4,6 +4,7 @@ local process = require("@lune/process") :: process
 local syntax = require("./syntax")
 local SyntaxKind = syntax.SyntaxKind
 local SyntaxKindInverse = syntax.SyntaxKindInverse
+local keywords = syntax.keywords
 local unpack = table.unpack
 
 export type Location = {
@@ -196,6 +197,11 @@ local function readIdentifier(state: LexerState): ()
     value = lexeme == "true"
   end
 
+  local keywordKind = keywords[lexeme]
+  if keywordKind then
+    kind = keywordKind
+  end
+
   addToken(state, kind, value)
 end
 
@@ -296,6 +302,18 @@ local function lex(state: LexerState): ()
     local kind = SyntaxKind.RArrow
     if match(state, "=") then
       kind = SyntaxKind.GTE
+    end
+    addToken(state, kind)
+  elseif char == "=" then
+    local kind = SyntaxKind.Equals
+    if match(state, "=") then
+      kind = SyntaxKind.EqualsEquals
+    end
+    addToken(state, kind)
+  elseif char == "!" then
+    local kind = SyntaxKind.Bang
+    if match(state, "=") then
+      kind = SyntaxKind.BangEquals
     end
     addToken(state, kind)
   elseif char == "\r" then
