@@ -7,6 +7,7 @@ local node = require("./ast/node")
 local expression = require("./ast/expression")
 local statement = require("./ast/statement")
 local literal = require("./ast/literal")
+local identifier = require("./ast/identifier")
 local unaryOp = require("./ast/unary-op")
 local binaryOp = require("./ast/binary-op")
 local SyntaxKind = syntax.SyntaxKind
@@ -72,6 +73,8 @@ local function parsePrimary(state: ParseState): expression.Expression
   local kind = token.kind
   if literalKinds[kind] then
     return literal(token)
+  elseif kind == SyntaxKind.Identifier then
+    return identifier(token)
   end
 
   return error(`unexpected token: {SyntaxKindInverse[kind]}`)
