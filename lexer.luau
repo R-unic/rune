@@ -121,7 +121,8 @@ end
 
 local tokenMeta = {}
 function tokenMeta.__tostring(token: Token): string
-  return `Token({SyntaxKindInverse[token.kind]}, '{token.lexeme}', {token.span})`
+  local valueString = if token.value ~= nil then ", " .. tostring(token.value) else ""
+  return `Token({SyntaxKindInverse[token.kind]}, '{token.lexeme}', {token.span}{valueString})`
 end
 
 local locationSpanMeta = {}
@@ -187,7 +188,15 @@ local function readIdentifier(state: LexerState): ()
     end
   end
 
-  addToken(state, SyntaxKind.Identifier)
+  local kind = SyntaxKind.Identifier
+  local value: TokenValue?
+  local lexeme = getCurrentLexeme(state)
+  if lexeme == "true" or lexeme == "false" then
+    kind = SyntaxKind.BoolLiteral
+    value = lexeme == "true"
+  end
+
+  addToken(state, kind, value)
 end
 
 local function readNumber(state: LexerState): ()
@@ -211,7 +220,23 @@ local function readNumber(state: LexerState): ()
   else
     SyntaxKind.IntLiteral
 
-  addToken(state, kind)
+  local lexeme = getCurrentLexeme(state)
+  addToken(state, kind, tonumber(lexeme))
+end
+
+local function readString(state: LexerState, terminator: number): ()
+  if not isEOF(state) then
+    local current = getCharacter(state)
+    while not isEOF(state) and current ~= terminator do
+      current = advance(state)
+      if not current then break end
+    end
+    advance(state)
+  end
+
+  local lexeme = getCurrentLexeme(state)
+  local value = string.sub(lexeme, 2, string.len(lexeme) - 1)
+  addToken(state, SyntaxKind.StringLiteral, value)
 end
 
 local singleCharMap = {
@@ -277,6 +302,8 @@ local function lex(state: LexerState): ()
     lex(state)
   elseif char == "\n" then
     skipNewLines(state)
+  elseif char == "'" or char == '"' then
+    readString(state, byte)
   elseif isNumeric(byte) then
     readNumber(state)
   elseif isAlphabetic(byte) or char == "_" then
