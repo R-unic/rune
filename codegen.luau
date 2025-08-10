@@ -7,8 +7,9 @@ local literal = require("./ast/literal")
 local unaryOp = require("./ast/unary-op")
 local binaryOp = require("./ast/binary-op")
 local syntax = require("./syntax")
+local op = require("./opcode")
 local Visitor = require("./visitor")
-local OpCode = require("./opcode")
+local OpCode = op.OpCode
 local SyntaxKind = syntax.SyntaxKind
 local SyntaxKindInverse = syntax.SyntaxKindInverse
 local clone = table.clone
@@ -64,13 +65,20 @@ function CodeGen.visitBinaryOpExpression(self: CodeGen, node: binaryOp.BinaryOp)
     error("unsupported binary operator: " .. SyntaxKindInverse[operator])
   end
 
-
   local left = self:visit(node.left)
   local register = self:_allocRegister()
   local right = self:visit(node.right)
+  local c = register + 1
+  local isConstant = (node.right :: literal.Literal).isConstant
+  if isConstant then
+    print("right is constant")
+    opcode = 2 * opcode - (opcode - OpCode.ADD)
+    c = #self.constants - 1
+  end
+
   self:_freeRegister()
-  local instruction: vm.Instruction = { opcode = opcode, A = register, B = register, C = register + 1 }
-  return zip(left, right, { instruction })
+  local instruction: vm.Instruction = { opcode = opcode, A = register, B = register, C = c }
+  return zip(left, if isConstant then {} else right, { instruction })
 end
 
 local unarySyntaxOpMap = {
@@ -96,12 +104,6 @@ function CodeGen.visitLiteralExpression(self: CodeGen, node: literal.Literal): B
   local value = node.token.value
   local register = self:_allocRegister()
   self:_freeRegister()
-
-  if type(value) == "number" then
-    return { {opcode = OpCode.LOADN, A = register, B = value } }
-  elseif type(value) == "nil" then
-    return { {opcode = OpCode.LOADNIL, A = register } }
-  end
 
   local constantIndex = self:_pushConstant(value)
   return { {opcode = OpCode.LOADK, A = register, B = constantIndex} }

@@ -2,7 +2,9 @@
 --!native
 local assert = require("./assert")
 local error = require("./error")
-local OpCode = require("./opcode")
+local op = require("./opcode")
+local OpCode = op.OpCode
+local OpCodeInverse = op.OpCodeInverse
 
 export type Instruction = {
   read opcode: number;
@@ -45,7 +47,7 @@ type BinaryOpInfo = {
   read execute: (Value, Value) -> Value;
 }
 
-local binaryOps: { [OpCode.OpCode]: BinaryOpInfo } = {
+local binaryOps: { [op.OpCode]: BinaryOpInfo } = {
   [OpCode.ADD] = {
     acceptedTypes = {
       number = true,
@@ -91,6 +93,11 @@ local binaryOps: { [OpCode.OpCode]: BinaryOpInfo } = {
   }
 }
 
+local constantBinaryOps: { [op.OpCode]: BinaryOpInfo } = {}
+for opcode, v in binaryOps do
+  constantBinaryOps[2 * opcode - (opcode - OpCode.ADD)] = v
+end
+
 local function execute(state: VmState, instruction: Instruction): ()
   local op = instruction.opcode
   local register = instruction.A
@@ -120,8 +127,8 @@ local function execute(state: VmState, instruction: Instruction): ()
     if binaryOp then
       local leftRegister = instruction.B :: number
       local rightRegister = instruction.C :: number
-      local left = pop(state, leftRegister) :: number
-      local right = pop(state, rightRegister) :: number
+      local left = pop(state, leftRegister)
+      local right = pop(state, rightRegister)
       local acceptedTypes = binaryOp.acceptedTypes
       local acceptedTypeNames = table.concat(keys(acceptedTypes), ", ")
       assert(acceptedTypes[type(left)], "expected left value for " .. op .. " to be (" .. acceptedTypeNames .. "), got " .. type(left))
@@ -131,7 +138,22 @@ local function execute(state: VmState, instruction: Instruction): ()
       return push(state, register, result)
     end
 
-    error("unhandled opcode: " .. op)
+    local constantBinaryOp = constantBinaryOps[op]
+    if constantBinaryOp then
+      local leftRegister = instruction.B :: number
+      local constantIndex = instruction.C :: number
+      local left = pop(state, leftRegister)
+      local right = state.constants[constantIndex + 1]
+      local acceptedTypes = constantBinaryOp.acceptedTypes
+      local acceptedTypeNames = table.concat(keys(acceptedTypes), ", ")
+      assert(acceptedTypes[type(left)], "expected left value for " .. op .. " to be (" .. acceptedTypeNames .. "), got " .. type(left))
+      assert(acceptedTypes[type(right)], "expected right value for " .. op .. " to be (" .. acceptedTypeNames .. "), got " .. type(right))
+
+      local result = constantBinaryOp.execute(left, right)
+      return push(state, register, result)
+    end
+
+    error("unhandled opcode: " .. OpCodeInverse[op])
   end
 end
 
