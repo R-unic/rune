@@ -6,23 +6,14 @@ local luau = require("@lune/luau") :: luau
 local varint = require("./varint")
 local tokenize = require("./lexer")
 local parse = require("./parser")
+local codegen = require("./codegen")
 local vm = require("./vm")
 local try = require("./try")
 
--- local path = process.args[1]
--- local source = try(fs.readFile, path)
--- local tokens = tokenize(source)
--- local ast = parse(tokens)
--- print(ast)
-
-local ROP_NOOP = 0
-local ROP_LOADN = 1
-local ROP_RETURN = 2
-
-local instructions: { vm.Instruction } = {
-  { opcode = ROP_LOADN, A = 0, B = 69 },
-  { opcode = ROP_RETURN, A = 0 }
-}
-
-local result = vm.run(instructions)
+local path = process.args[1]
+local source = try(fs.readFile, path)
+local tokens = tokenize(source)
+local ast = parse(tokens)
+local bytecode = codegen(ast)
+local result = vm.run(bytecode)
 print(result)
