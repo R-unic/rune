@@ -1,21 +1,20 @@
 --!strict
 --!native
+local meta = require("./meta")
 local expression = require("./expression")
 local token = require("../token")
-local util = require("../util-types")
 
-local UnaryOp = {}
+local UnaryOp = setmetatable({ name = "UnaryOp" }, meta.Expression)
 export type UnaryOp = expression.Expression & {
   read operand: expression.Expression;
   read operator: token.Token;
 }
 
 local function unaryOp(operand: expression.Expression, operator: token.Token): UnaryOp
-  local node = expression() :: util.writable<UnaryOp>
-  node.operand = operand
-  node.operator = operator
-
-  return setmetatable(node, UnaryOp) :: any
+  return setmetatable({
+    operand = operand,
+    operator = operator
+  }, UnaryOp)
 end
 
 return unaryOp

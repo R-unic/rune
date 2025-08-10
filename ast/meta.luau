@@ -1,18 +1,20 @@
 --!strict
 --!native
-local Node = {}
-local Expression = setmetatable({}, Node)
-local Statement = setmetatable({}, Node)
+local Node = { name = "Node" }
+local Expression = setmetatable({ name = "Expression" }, Node)
+local Statement = setmetatable({ name = "Statement" }, Node)
 
-local function hasMetatable<T>(t: T, mt: {}): boolean
-  local meta = getmetatable(t)
-  local match = meta == mt
-  while meta do
-    meta = getmetatable(meta) :: {}
-    match = match or meta == mt
+local function hasMetatable<T>(t: T, mt: { read name: string; }): boolean
+  local meta = t
+  while true do
+    meta = getmetatable(meta) :: { read name: string; }
+    if meta.name == mt.name then
+      return true
+    end
+    if meta == nil then break end
   end
 
-  return match
+  return false
 end
 
 local function isNode<T>(t: T & {}): boolean

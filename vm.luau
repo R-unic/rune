@@ -1,5 +1,7 @@
 --!strict
 --!native
+local OpCode = require("./opcode")
+
 export type Instruction = {
   read opcode: number;
   read A: number;
@@ -16,10 +18,6 @@ type VmState = {
   ip: number;
 }
 
-local ROP_NOOP = 0
-local ROP_LOADN = 1
-local ROP_RETURN = 2
-
 local function pop(state: VmState, register: number): Value
   local value = state.memory[register]
   state.memory[register] = nil
@@ -30,18 +28,15 @@ local function pushConstant(state: VmState, register: number, constant: Constant
   state.memory[register] = constant
 end
 
-local function execute(state: VmState, instruction: Instruction, returnOutput: (Value) -> ()): ()
+local function execute(state: VmState, instruction: Instruction): ()
   local op = instruction.opcode
   local register = instruction.A
 
-  if op == ROP_NOOP then
+  if op == OpCode.NOOP then
     -- do nothing
-  elseif op == ROP_LOADN then
+  elseif op == OpCode.LOADN then
     local value = instruction.B
     pushConstant(state, register, value)
-  elseif op == ROP_RETURN then
-    local value = pop(state, register)
-    returnOutput(value)
   end
 end
 
@@ -53,19 +48,13 @@ local function run(instructions: { Instruction }): Value
     ip = 1
   }
 
-  local active = true
-  local returnValue: Value
-  local function returnOutput(value: Value): ()
-    returnValue = value
-    active = false
-  end
-
-  while active and state.ip <= count do
+  while state.ip <= count do
     local instruction = instructions[state.ip]
-    execute(state, instruction, returnOutput)
+    execute(state, instruction)
     state.ip += 1
   end
-  return returnValue
+
+  return state.memory[#state.memory]
 end
 
 return {

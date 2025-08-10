@@ -1,10 +1,10 @@
 --!strict
 --!native
+local meta = require("./meta")
 local expression = require("./expression")
 local token = require("../token")
-local util = require("../util-types")
 
-local BinaryOp = {}
+local BinaryOp = setmetatable({ name = "BinaryOp" }, meta.Expression)
 export type BinaryOp = expression.Expression & {
   read left: expression.Expression;
   read operator: token.Token;
@@ -12,12 +12,11 @@ export type BinaryOp = expression.Expression & {
 }
 
 local function binaryOp(left: expression.Expression, operator: token.Token, right: expression.Expression): BinaryOp
-  local node = expression() :: util.writable<BinaryOp>
-  node.left = left
-  node.operator = operator
-  node.right = right
-
-  return setmetatable(node, BinaryOp) :: any
+  return setmetatable({
+    left = left,
+    operator = operator,
+    right = right,
+  }, BinaryOp)
 end
 
 return binaryOp

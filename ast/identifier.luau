@@ -1,19 +1,16 @@
 --!strict
 --!native
+local meta = require("./meta")
 local expression = require("./expression")
 local token = require("../token")
-local util = require("../util-types")
 
-local Identifier = {}
+local Identifier = setmetatable({ name = "Identifier" }, meta.Expression)
 export type Identifier = expression.Expression & {
   read token: token.Token;
 }
 
 local function identifier(token: token.Token): Identifier
-  local node = expression() :: util.writable<Identifier>
-  node.token = token
-
-  return setmetatable(node, Identifier) :: any
+  return setmetatable({ token = token }, Identifier)
 end
 
 return identifier
