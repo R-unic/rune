@@ -2,6 +2,8 @@
 --!native
 local node = require("./ast/node")
 local literal = require("./ast/literal")
+local identifier = require("./ast/identifier")
+local unaryOp = require("./ast/unary-op")
 local binaryOp = require("./ast/binary-op")
 local astMeta = require("./ast/meta")
 local isExpression = astMeta.isExpression
@@ -27,6 +29,14 @@ function Visitor.visit<T...>(self: Visitor<T...>, node: node.Node): T...
 end
 
 function Visitor.visitLiteralExpression<T...>(self: Visitor<T...>, node: literal.Literal): T...
+  return nil
+end
+
+function Visitor.visitIdentifierExpression<T...>(self: Visitor<T...>, node: identifier.Identifier): T...
+  return nil
+end
+
+function Visitor.visitUnaryOpExpression<T...>(self: Visitor<T...>, node: unaryOp.UnaryOp): T...
   return nil
 end
 

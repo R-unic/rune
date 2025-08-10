@@ -7,6 +7,8 @@ local OpCode = {
   LOADN = 1,
   LOADK = 2,
   LOADNIL = 3,
+  NOT = 4,
+  NEGATE = 5,
 }
 table.freeze(OpCode)
 

@@ -1,5 +1,6 @@
 --!strict
 --!native
+local assert = require("./assert")
 local OpCode = require("./opcode")
 
 export type Instruction = {
@@ -18,13 +19,14 @@ type VmState = {
   ip: number;
 }
 
-local function pop(state: VmState, register: number): Value
+local function pop(state: VmState, register: number, replacer: ((Value) -> Value)?): Value
+  replacer = replacer or function(): Value return nil end
   local value = state.memory[register]
-  state.memory[register] = nil
+  state.memory[register] = replacer(value)
   return value
 end
 
-local function pushConstant(state: VmState, register: number, constant: ConstantValue): ()
+local function push(state: VmState, register: number, constant: Value): ()
   state.memory[register] = constant
 end
 
@@ -36,7 +38,18 @@ local function execute(state: VmState, instruction: Instruction): ()
     -- do nothing
   elseif op == OpCode.LOADN then
     local value = instruction.B
-    pushConstant(state, register, value)
+    push(state, register, value)
+  elseif op == OpCode.NEGATE then
+    local sourceRegister = instruction.B :: number
+    local value = pop(state, sourceRegister) :: number
+    assert(type(value) == "number", "expected operand value for NEGATE to be a number")
+
+    push(state, register, -value)
+  elseif op == OpCode.NOT then
+    local sourceRegister = instruction.B :: number
+    local value = pop(state, sourceRegister)
+
+    push(state, register, not value)
   end
 end
 

@@ -1,12 +1,26 @@
 --!strict
 --!native
+local error = require("./error")
 local vm = require("./vm")
 local node = require("./ast/node")
 local literal = require("./ast/literal")
+local unaryOp = require("./ast/unary-op")
 local binaryOp = require("./ast/binary-op")
-local OpCode = require("./opcode")
+local syntax = require("./syntax")
 local Visitor = require("./visitor")
--- local literal = require("./ast/literal")
+local OpCode = require("./opcode")
+local SyntaxKind = syntax.SyntaxKind
+local SyntaxKindInverse = syntax.SyntaxKindInverse
+local clone = table.clone
+local insert = table.insert
+
+local function zip<T>(a: { T }, b: { T }): { T }
+  local result = clone(a)
+  for _, v in b do
+    insert(result, v)
+  end
+  return result
+end
 
 export type Bytecode = { vm.Instruction }
 
@@ -32,8 +46,24 @@ function CodeGen.visit(self: CodeGen, node: node.Node): (Bytecode, { vm.Constant
   return instructions, self.constants
 end
 
-function CodeGen.visitBinaryOpExpression(self: CodeGen, node: binaryOp.BinaryOp): Bytecode
-  return {  }
+local syntaxOpMap = {
+  [SyntaxKind.Bang] = OpCode.NOT,
+  [SyntaxKind.Minus] = OpCode.NEGATE
+}
+
+function CodeGen.visitUnaryOpExpression(self: CodeGen, node: unaryOp.UnaryOp): Bytecode
+  local operator = node.operator.kind
+  local opcode = syntaxOpMap[operator]
+  if not opcode then
+    error("unsupported unary operator: " .. SyntaxKindInverse[operator])
+  end
+
+  local register = self:_allocRegister()
+  self:_freeRegister()
+
+  local operandBytecode = self:visit(node.operand)
+  local instruction: vm.Instruction = { opcode = opcode, A = register, B = register }
+  return zip(operandBytecode, { instruction })
 end
 
 function CodeGen.visitLiteralExpression(self: CodeGen, node: literal.Literal): Bytecode
@@ -52,7 +82,7 @@ end
 
 function CodeGen._pushConstant(self: CodeGen, constant: vm.ConstantValue): number
   local index = #self.constants
-  table.insert(self.constants, constant)
+  insert(self.constants, constant)
   return index
 end
 
@@ -62,8 +92,9 @@ function CodeGen._allocRegister(self: CodeGen): number
   return register
 end
 
-function CodeGen._freeRegister(self: CodeGen): ()
-  self.nextAvailableRegister = math.max(self.nextAvailableRegister - 1, 0)
+function CodeGen._freeRegister(self: CodeGen, count: number?): ()
+  count = count or 1
+  self.nextAvailableRegister = math.max(self.nextAvailableRegister - count, 0)
 end
 
 return CodeGen
