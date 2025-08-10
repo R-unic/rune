@@ -56,7 +56,7 @@ local gen = bytecode.createProto(get123, get123Constants, 3)
 local expected = luau.compile("return 123")
 
 print("expected bytecode:", string.byte(expected, 1, #expected))
-print("__result bytecode:", string.byte(gen, 1, #gen))
+print("  result bytecode:", string.byte(gen, 1, #gen))
 
 print("loading genned bytecode...")
 local success, fn = pcall(luau.load, gen)

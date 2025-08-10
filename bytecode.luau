@@ -177,8 +177,10 @@ local function createPrototype(
   local nChildPrototypes = varint.encode(0)
   local lineDefined = varint.encode(0)
   local name = varint.encode(0)
-  local hasLines = char(1)
-  local hasDebug = char(0)
+  local doLineInfo = true
+  local doDebugInfo = false
+  local hasLines = char(if doLineInfo then 1 else 0)
+  local hasDebug = char(if doDebugInfo then 1 else 0)
 
   -- debug/line table: Luau expects a little blob here if hasLines is set.
   local lineNumbers: { number } = {}
@@ -224,8 +226,8 @@ local function createPrototype(
     nInstructions, instructionsBlob,
     nConstants, constantsBlob,
     nChildPrototypes, lineDefined, name,
-    hasLines, linesBlob,
-    hasDebug, debugBlob
+    hasLines, if doLineInfo then linesBlob else "",
+    hasDebug, if doDebugInfo then debugBlob else ""
   })
 end
 
