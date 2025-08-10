@@ -11,7 +11,7 @@ local isExpression = astMeta.isExpression
 local Visitor = {}
 Visitor.__index = Visitor
 
-export type Visitor<T> = setmetatable<{}, typeof(Visitor)>
+export type Visitor<T...> = setmetatable<{}, typeof(Visitor)>
 
 function Visitor.new<T...>(): Visitor<T...>
   return setmetatable({}, Visitor)
@@ -25,23 +25,11 @@ function Visitor.visit<T...>(self: Visitor<T...>, node: node.Node): T...
 
   local nodeMeta = (getmetatable(node) :: any) :: { name: string }
   local functionName = `visit{nodeMeta.name}{kind}`
-  return self[functionName](self, node)
-end
-
-function Visitor.visitLiteralExpression<T...>(self: Visitor<T...>, node: literal.Literal): T...
-  return nil
-end
-
-function Visitor.visitIdentifierExpression<T...>(self: Visitor<T...>, node: identifier.Identifier): T...
-  return nil
-end
-
-function Visitor.visitUnaryOpExpression<T...>(self: Visitor<T...>, node: unaryOp.UnaryOp): T...
-  return nil
-end
-
-function Visitor.visitBinaryOpExpression<T...>(self: Visitor<T...>, node: binaryOp.BinaryOp): T...
-  return nil
+  local f = (self :: { [string]: (...unknown) -> T... })[functionName]
+  if not f then
+    return nil :: any
+  end
+  return f(self, node)
 end
 
 return Visitor -- hopefully the only class

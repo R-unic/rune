@@ -9,6 +9,7 @@ local binaryOp = require("./ast/binary-op")
 local syntax = require("./syntax")
 local op = require("./opcode")
 local Visitor = require("./visitor")
+local Binder = require("./binder")
 local OpCode = op.OpCode
 local SyntaxKind = syntax.SyntaxKind
 local SyntaxKindInverse = syntax.SyntaxKindInverse
@@ -33,7 +34,7 @@ CodeGen.__index = CodeGen
 
 local MAX_REGISTER = 16
 
-export type CodeGen = typeof(CodeGen) & {
+export type CodeGen = typeof(CodeGen) & Visitor.Visitor<Bytecode> & {
   read constants: { vm.ConstantValue };
   nextAvailableRegister: number;
 }
@@ -46,7 +47,7 @@ function CodeGen.new(): CodeGen
 end
 
 function CodeGen.generate(self: CodeGen, node: node.Node): (Bytecode, { vm.ConstantValue })
-  local instructions = Visitor.visit(self, node)
+  local instructions = self:visit(node)
   return instructions, self.constants
 end
 
@@ -69,9 +70,8 @@ function CodeGen.visitBinaryOpExpression(self: CodeGen, node: binaryOp.BinaryOp)
   local register = self:_allocRegister()
   local right = self:visit(node.right)
   local c = register + 1
-  local isConstant = (node.right :: literal.Literal).isConstant
+  local isConstant = (node.right :: Binder.Bound<node.Node>).symbol.isConstant
   if isConstant then
-    print("right is constant")
     opcode = 2 * opcode - (opcode - OpCode.ADD)
     c = #self.constants - 1
   end
