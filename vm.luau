@@ -1,6 +1,7 @@
 --!strict
 --!native
 local assert = require("./assert")
+local error = require("./error")
 local OpCode = require("./opcode")
 
 export type Instruction = {
@@ -15,9 +16,18 @@ export type Value = ConstantValue
 
 type VmState = {
   read count: number;
+  read constants: { ConstantValue };
   read memory: { Value };
   ip: number;
 }
+
+local function keys<K, V>(t: { [K]: V }): { K }
+  local result: { K } = {}
+  for k in t do
+    table.insert(result, k)
+  end
+  return result
+end
 
 local function pop(state: VmState, register: number, replacer: ((Value) -> Value)?): Value
   replacer = replacer or function(): Value return nil end
@@ -30,6 +40,57 @@ local function push(state: VmState, register: number, constant: Value): ()
   state.memory[register] = constant
 end
 
+type BinaryOpInfo = {
+  read acceptedTypes: { [string]: boolean };
+  read execute: (Value, Value) -> Value;
+}
+
+local binaryOps: { [OpCode.OpCode]: BinaryOpInfo } = {
+  [OpCode.ADD] = {
+    acceptedTypes = {
+      number = true,
+      string = true
+    },
+    execute = function(a, b): string | number
+      if type(a) == "string" or type(b) == "string" then
+        return tostring(a) .. tostring(b)
+      end
+
+      return a :: number + b :: number
+    end
+  },
+  [OpCode.SUB] = {
+    acceptedTypes = { number = true },
+    execute = function(a, b): number
+      return a :: number - b :: number
+    end
+  },
+  [OpCode.MUL] = {
+    acceptedTypes = { number = true },
+    execute = function(a, b): number
+      return a :: number * b :: number
+    end
+  },
+  [OpCode.DIV] = {
+    acceptedTypes = { number = true },
+    execute = function(a, b): number
+      return a :: number / b :: number
+    end
+  },
+  [OpCode.POW] = {
+    acceptedTypes = { number = true },
+    execute = function(a, b): number
+      return a :: number ^ b :: number
+    end
+  },
+  [OpCode.MOD] = {
+    acceptedTypes = { number = true },
+    execute = function(a, b): number
+      return a :: number % b :: number
+    end
+  }
+}
+
 local function execute(state: VmState, instruction: Instruction): ()
   local op = instruction.opcode
   local register = instruction.A
@@ -38,6 +99,10 @@ local function execute(state: VmState, instruction: Instruction): ()
     -- do nothing
   elseif op == OpCode.LOADN then
     local value = instruction.B
+    push(state, register, value)
+  elseif op == OpCode.LOADK then
+    local index = instruction.B :: number
+    local value = state.constants[index + 1]
     push(state, register, value)
   elseif op == OpCode.NEGATE then
     local sourceRegister = instruction.B :: number
@@ -50,13 +115,31 @@ local function execute(state: VmState, instruction: Instruction): ()
     local value = pop(state, sourceRegister)
 
     push(state, register, not value)
+  else
+    local binaryOp = binaryOps[op]
+    if binaryOp then
+      local leftRegister = instruction.B :: number
+      local rightRegister = instruction.C :: number
+      local left = pop(state, leftRegister) :: number
+      local right = pop(state, rightRegister) :: number
+      local acceptedTypes = binaryOp.acceptedTypes
+      local acceptedTypeNames = table.concat(keys(acceptedTypes), ", ")
+      assert(acceptedTypes[type(left)], "expected left value for " .. op .. " to be (" .. acceptedTypeNames .. "), got " .. type(left))
+      assert(acceptedTypes[type(right)], "expected right value for " .. op .. " to be (" .. acceptedTypeNames .. "), got " .. type(right))
+
+      local result = binaryOp.execute(left, right)
+      return push(state, register, result)
+    end
+
+    error("unhandled opcode: " .. op)
   end
 end
 
-local function run(instructions: { Instruction }): Value
+local function run(instructions: { Instruction }, constants: { ConstantValue }): Value
   local count = #instructions
   local state: VmState = {
     count = count,
+    constants = constants,
     memory = {},
     ip = 1
   }

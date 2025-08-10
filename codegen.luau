@@ -14,10 +14,13 @@ local SyntaxKindInverse = syntax.SyntaxKindInverse
 local clone = table.clone
 local insert = table.insert
 
-local function zip<T>(a: { T }, b: { T }): { T }
+local function zip<T>(a: { T }, ...: { T }): { T }
   local result = clone(a)
-  for _, v in b do
-    insert(result, v)
+  for i = 1, select("#", ...) do
+    local t = select(i, ...)
+    for _, v in t do
+      insert(result, v)
+    end
   end
   return result
 end
@@ -41,19 +44,42 @@ function CodeGen.new(): CodeGen
   }, CodeGen) :: any
 end
 
-function CodeGen.visit(self: CodeGen, node: node.Node): (Bytecode, { vm.ConstantValue })
+function CodeGen.generate(self: CodeGen, node: node.Node): (Bytecode, { vm.ConstantValue })
   local instructions = Visitor.visit(self, node)
   return instructions, self.constants
 end
 
-local syntaxOpMap = {
+local binarySyntaxOpMap = {
+  [SyntaxKind.Plus] = OpCode.ADD,
+  [SyntaxKind.Minus] = OpCode.SUB,
+  [SyntaxKind.Star] = OpCode.MUL,
+  [SyntaxKind.Slash] = OpCode.DIV,
+  [SyntaxKind.Carat] = OpCode.POW,
+  [SyntaxKind.Percent] = OpCode.MOD
+}
+function CodeGen.visitBinaryOpExpression(self: CodeGen, node: binaryOp.BinaryOp): Bytecode
+  local operator = node.operator.kind
+  local opcode = binarySyntaxOpMap[operator]
+  if not opcode then
+    error("unsupported binary operator: " .. SyntaxKindInverse[operator])
+  end
+
+
+  local left = self:visit(node.left)
+  local register = self:_allocRegister()
+  local right = self:visit(node.right)
+  self:_freeRegister()
+  local instruction: vm.Instruction = { opcode = opcode, A = register, B = register, C = register + 1 }
+  return zip(left, right, { instruction })
+end
+
+local unarySyntaxOpMap = {
   [SyntaxKind.Bang] = OpCode.NOT,
   [SyntaxKind.Minus] = OpCode.NEGATE
 }
-
 function CodeGen.visitUnaryOpExpression(self: CodeGen, node: unaryOp.UnaryOp): Bytecode
   local operator = node.operator.kind
-  local opcode = syntaxOpMap[operator]
+  local opcode = unarySyntaxOpMap[operator]
   if not opcode then
     error("unsupported unary operator: " .. SyntaxKindInverse[operator])
   end
@@ -61,21 +87,22 @@ function CodeGen.visitUnaryOpExpression(self: CodeGen, node: unaryOp.UnaryOp): B
   local register = self:_allocRegister()
   self:_freeRegister()
 
-  local operandBytecode = self:visit(node.operand)
+  local operand = self:visit(node.operand)
   local instruction: vm.Instruction = { opcode = opcode, A = register, B = register }
-  return zip(operandBytecode, { instruction })
+  return zip(operand, { instruction })
 end
 
 function CodeGen.visitLiteralExpression(self: CodeGen, node: literal.Literal): Bytecode
   local value = node.token.value
   local register = self:_allocRegister()
+  self:_freeRegister()
+
   if type(value) == "number" then
     return { {opcode = OpCode.LOADN, A = register, B = value } }
   elseif type(value) == "nil" then
     return { {opcode = OpCode.LOADNIL, A = register } }
   end
 
-  self:_freeRegister()
   local constantIndex = self:_pushConstant(value)
   return { {opcode = OpCode.LOADK, A = register, B = constantIndex} }
 end

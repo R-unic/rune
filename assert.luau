@@ -2,9 +2,16 @@
 --!native
 local error = require("./error")
 
-local function assert(condition: unknown, message: string?): ()
-  if condition then return end
+type function negate(ty)
+  return types.negationof(ty)
+end
+
+local function assert<T>(condition: T, message: string?): T & negate<false?>
+  if condition then
+    return nil :: any
+  end
   error(message or "assertion failed!")
+  return nil :: any
 end
 
 return assert
