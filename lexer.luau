@@ -262,6 +262,12 @@ local function lex(state: LexState): ()
       kind = SyntaxKind.BangEquals
     end
     addToken(state, kind)
+  elseif char == ":" then
+    local kind = SyntaxKind.Colon
+    if match(state, ":") then
+      kind = SyntaxKind.ColonColon
+    end
+    addToken(state, kind)
   elseif char == "\r" then
     lex(state)
   elseif char == "\n" then

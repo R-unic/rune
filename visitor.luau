@@ -23,7 +23,7 @@ function Visitor.visit<T...>(self: Visitor<T...>, node: node.Node): T...
   local functionName = `visit{nodeMeta.name}{kind}`
   local f = (self :: { [string]: (...unknown) -> T... })[functionName]
   if not f then
-    return nil :: any
+    return node :: any
   end
   return f(self, node)
 end

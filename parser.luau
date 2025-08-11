@@ -1,11 +1,16 @@
 --!strict
 --!native
+local assert = require("./assert")
+local error = require("./error")
 local syntax = require("./syntax")
 local token = require("./token")
-local error = require("./error")
-local node = require("./ast/node")
 local expression = require("./ast/expression")
 local statement = require("./ast/statement")
+local typeRef = require("./ast/type-ref")
+local singularType = require("./ast/singular-type")
+local syntaxTree = require("./ast/syntax-tree")
+local varDeclaration = require("./ast/var-declaration")
+local expressionStatement = require("./ast/expression-statement")
 local literal = require("./ast/literal")
 local identifier = require("./ast/identifier")
 local unaryOp = require("./ast/unary-op")
@@ -42,6 +47,14 @@ local function advance(state: ParseState): token.Token?
   return current
 end
 
+local function consume(state: ParseState, kind: syntax.SyntaxKind, expected: string?): token.Token
+  local current = getCurrent(state)
+  assert(current.kind == kind, `expected {expected or kind}, got {current.kind}`)
+  advance(state)
+
+  return current
+end
+
 local function match(state: ParseState, ...: syntax.SyntaxKind): boolean
   local kinds = {...}
   local current = getCurrent(state)
@@ -55,6 +68,15 @@ local function match(state: ParseState, ...: syntax.SyntaxKind): boolean
   end
 
   return isMatch
+end
+
+local function parseSingularType(state: ParseState): typeRef.TypeRef
+  local name = consume(state, SyntaxKind.Identifier, "type")
+  return singularType(name)
+end
+
+local function parseType(state: ParseState): typeRef.TypeRef
+  return parseSingularType(state)
 end
 
 local literalKinds = {
@@ -118,14 +140,40 @@ local function parseExpression(state: ParseState): expression.Expression
   return parseOr(state)
 end
 
-local function parse(tokens: { token.Token }): node.Node
+local function parseVarDeclaration(state: ParseState): varDeclaration.VarDeclaration
+  local keyword = getPrevious(state)
+  local name = consume(state, SyntaxKind.Identifier)
+  local type: typeRef.TypeRef?
+  if match(state, SyntaxKind.Colon) then
+    type = parseType(state)
+  end
+  consume(state, SyntaxKind.Equals)
+  local initializer = parseExpression(state)
+
+  return varDeclaration(keyword, name, type, initializer)
+end
+
+local function parseStatement(state: ParseState): statement.Statement
+  if match(state, SyntaxKind.LetKeyword) then
+    return parseVarDeclaration(state)
+  end
+
+  return expressionStatement(parseExpression(state))
+end
+
+local function parse(tokens: { token.Token }): syntaxTree.SyntaxTree
   local state: ParseState = {
     tokens = tokens,
     tokensLength = #tokens,
     position = 1
   }
 
-  return parseExpression(state)
+  local statements: { statement.Statement } = {}
+  while not isEOF(state) do
+    table.insert(statements, parseStatement(state))
+  end
+
+  return syntaxTree(statements)
 end
 
 return parse

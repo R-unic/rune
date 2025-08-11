@@ -1,6 +1,9 @@
 --!strict
 --!native
 local node = require("./ast/node")
+local syntaxTree = require("./ast/syntax-tree")
+local varDeclaration = require("./ast/var-declaration")
+local expressionStatement = require("./ast/expression-statement")
 local literal = require("./ast/literal")
 local unaryOp = require("./ast/unary-op")
 local binaryOp = require("./ast/binary-op")
@@ -47,9 +50,9 @@ export type Binder = typeof(Binder) & Visitor.Visitor<Bound<node.Node>> & {
 
 }
 
-local function bindSymbol<T>(node: T, name: string?, ty: string, isConstant: boolean?): Bound<T>
+local function bindSymbol<T>(node: T, name: string?, ty: string, isConstant: boolean?, isDeclaredType: boolean?): Bound<T>
   local bound = node :: Bound<node.Node>
-  bound.symbol = symbol(name, ty, isConstant)
+  bound.symbol = symbol(name, ty, isConstant, isDeclaredType)
 
   return bound :: any
 end
@@ -60,6 +63,28 @@ end
 
 function Binder.bind<T>(self: Binder, node: node.Node & T): Bound<T>
   return self:visit(node)
+end
+
+function Binder.visitSyntaxTreeStatement(self: Binder, node: syntaxTree.SyntaxTree): syntaxTree.SyntaxTree
+  for _, statement in node.statements do
+    self:bind(statement)
+  end
+  return node
+end
+
+function Binder.visitVarDeclarationStatement(self: Binder, node: Bound<varDeclaration.VarDeclaration>): Bound<varDeclaration.VarDeclaration>
+  if node.initializer ~= nil then
+    self:bind(node.initializer)
+
+    local symbol = node.initializer.symbol
+    return bindSymbol(node :: any, node.name.lexeme, symbol.type, symbol.isConstant, node.type ~= nil)
+  end
+  return node
+end
+
+function Binder.visitExpressionStatementStatement(self: Binder, node: expressionStatement.ExpressionStatement): expressionStatement.ExpressionStatement
+  self:bind(node.expression)
+  return node
 end
 
 function Binder.visitLiteralExpression(self: Binder, node: Bound<literal.Literal>): Bound<literal.Literal>
