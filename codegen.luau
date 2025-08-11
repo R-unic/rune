@@ -8,8 +8,8 @@ local unaryOp = require("./ast/unary-op")
 local binaryOp = require("./ast/binary-op")
 local syntax = require("./syntax")
 local op = require("./opcode")
-local Visitor = require("./visitor")
 local Binder = require("./binder")
+local Visitor = require("./visitor")
 local OpCode = op.OpCode
 local SyntaxKind = syntax.SyntaxKind
 local SyntaxKindInverse = syntax.SyntaxKindInverse
@@ -46,7 +46,7 @@ function CodeGen.new(): CodeGen
   }, CodeGen) :: any
 end
 
-function CodeGen.generate(self: CodeGen, node: node.Node): (Bytecode, { vm.ConstantValue })
+function CodeGen.generateProgram(self: CodeGen, node: node.Node): (Bytecode, { vm.ConstantValue })
   local instructions = self:visit(node)
   return instructions, self.constants
 end
@@ -59,18 +59,18 @@ local binarySyntaxOpMap = {
   [SyntaxKind.Carat] = OpCode.POW,
   [SyntaxKind.Percent] = OpCode.MOD
 }
-function CodeGen.visitBinaryOpExpression(self: CodeGen, node: binaryOp.BinaryOp): Bytecode
+function CodeGen.visitBinaryOpExpression(self: CodeGen, node: Binder.Bound<binaryOp.BinaryOp>): Bytecode
   local operator = node.operator.kind
   local opcode = binarySyntaxOpMap[operator]
   if not opcode then
     error("unsupported binary operator: " .. SyntaxKindInverse[operator])
   end
 
-  local left = self:visit(node.left)
+  local left = self:_generate(node.left)
   local register = self:_allocRegister()
-  local right = self:visit(node.right)
+  local right = self:_generate(node.right)
   local c = register + 1
-  local isConstant = (node.right :: Binder.Bound<node.Node>).symbol.isConstant
+  local isConstant = node.right.symbol and node.right.symbol.isConstant
   if isConstant then
     opcode = 2 * opcode - (opcode - OpCode.ADD)
     c = #self.constants - 1
@@ -85,7 +85,7 @@ local unarySyntaxOpMap = {
   [SyntaxKind.Bang] = OpCode.NOT,
   [SyntaxKind.Minus] = OpCode.NEGATE
 }
-function CodeGen.visitUnaryOpExpression(self: CodeGen, node: unaryOp.UnaryOp): Bytecode
+function CodeGen.visitUnaryOpExpression(self: CodeGen, node: Binder.Bound<unaryOp.UnaryOp>): Bytecode
   local operator = node.operator.kind
   local opcode = unarySyntaxOpMap[operator]
   if not opcode then
@@ -95,12 +95,12 @@ function CodeGen.visitUnaryOpExpression(self: CodeGen, node: unaryOp.UnaryOp): B
   local register = self:_allocRegister()
   self:_freeRegister()
 
-  local operand = self:visit(node.operand)
+  local operand = self:_generate(node.operand)
   local instruction: vm.Instruction = { opcode = opcode, A = register, B = register }
   return zip(operand, { instruction })
 end
 
-function CodeGen.visitLiteralExpression(self: CodeGen, node: literal.Literal): Bytecode
+function CodeGen.visitLiteralExpression(self: CodeGen, node: Binder.Bound<literal.Literal>): Bytecode
   local value = node.token.value
   local register = self:_allocRegister()
   self:_freeRegister()
@@ -124,6 +124,10 @@ end
 function CodeGen._freeRegister(self: CodeGen, count: number?): ()
   count = count or 1
   self.nextAvailableRegister = math.max(self.nextAvailableRegister - count, 0)
+end
+
+function CodeGen._generate(self: CodeGen, node: node.Node): Bytecode
+  return self:visit(node)
 end
 
 return CodeGen

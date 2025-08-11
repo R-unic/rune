@@ -1,10 +1,6 @@
 --!strict
 --!native
 local node = require("./ast/node")
-local literal = require("./ast/literal")
-local identifier = require("./ast/identifier")
-local unaryOp = require("./ast/unary-op")
-local binaryOp = require("./ast/binary-op")
 local astMeta = require("./ast/meta")
 local isExpression = astMeta.isExpression
 

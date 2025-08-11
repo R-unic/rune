@@ -1,6 +1,7 @@
 export type Symbol = {
   read name: string;
   read type: string;
+  read declaredType: string?;
   read isConstant: boolean;
 }
 

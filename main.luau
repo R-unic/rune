@@ -19,7 +19,7 @@ local binder = Binder.new()
 binder:visit(ast)
 print(ast)
 local codegen = CodeGen.new()
-local bytecode, constants = codegen:generate(ast)
+local bytecode, constants = codegen:generateProgram(ast)
 
 local spaceLength = 12
 local function stringify(instruction: vm.Instruction): string
